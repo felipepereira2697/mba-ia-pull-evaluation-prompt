@@ -360,7 +360,20 @@ O prompt otimizado está em `prompts/bug_to_user_story_v2.yml` e usa três técn
 ### Few-shot Learning
 
 - **Por que:** é obrigatória no desafio e mostra ao modelo o nível de detalhe esperado, o que seria difícil de descrever só com regras.
-- **Como:** o `system_prompt` traz três pares de relato e resposta, um para cada nível de complexidade (simples, médio e complexo).
+- **Como:** o `system_prompt` traz três pares de relato e resposta, um para cada nível de complexidade (simples, médio e complexo). Trecho do exemplo simples:
+
+```
+Relato:
+Campo de email aceita texto sem @, permitindo cadastros inválidos.
+
+Resposta:
+Como um usuário criando uma conta, eu quero que o sistema valide meu email corretamente, para que eu não insira um endereço inválido por engano.
+
+Critérios de Aceitação:
+- Dado que estou no formulário de cadastro
+- Quando digito um email sem o caractere @
+- Então devo ver uma mensagem de erro
+```
 
 Esses três exemplos foram copiados do dataset de avaliação (linhas 2, 7 e 13 de `datasets/bug_to_user_story.jsonl`). Por isso, as notas desses exemplos tendem a ficar infladas, já que o modelo vê as respostas esperadas. Os outros 12 exemplos medem melhor a capacidade real do prompt.
 
@@ -372,7 +385,15 @@ Esses três exemplos foram copiados do dataset de avaliação (linhas 2, 7 e 13 
 ### Skeleton of Thought
 
 - **Por que:** as respostas de referência têm estrutura previsível, que cresce com a complexidade do bug. Um esqueleto fixo reproduz essa estrutura sem imprimir o raciocínio na resposta, o que poderia reduzir as notas de Clarity e Precision.
-- **Como:** o prompt define etapas internas de construção e as seções exigidas para cada nível de complexidade.
+- **Como:** o prompt define etapas internas de construção e as seções exigidas para cada nível de complexidade. Trecho das etapas:
+
+```
+Siga estas etapas internamente e devolva apenas o resultado final, sem mostrar a análise:
+1. Classifique a complexidade do relato: simples, médio ou complexo.
+2. Identifique quem é afetado pelo problema, que será a persona da história.
+3. Escreva a história descrevendo o comportamento esperado.
+4. Escreva os critérios de aceitação e as demais seções exigidas para o nível.
+```
 
 ## Resultados Finais
 
@@ -392,9 +413,35 @@ Alguns exemplos ficaram abaixo de 0.8 em uma métrica, sem reprovar o prompt, po
 
 ### Evidências no LangSmith
 
-- Link público do dataset de avaliação: pendente
-- Screenshots das avaliações: pendente
-- Tracing detalhado de 3 exemplos: pendente
+- [Link público do dataset de avaliação, com o experimento](https://smith.langchain.com/public/d089ff2e-de2f-49a0-b321-af6d600485a7/d)
+
+#### Notas da avaliação
+
+Experimento `bebopdev-bug_to_user_story_v2-951806f4`, com as 15 execuções e as médias das 5 métricas acima de 0.8.
+
+![Notas do experimento aprovado](docs/experimento_notas.png)
+
+#### Tracing de 3 exemplos
+
+Cada print mostra a chamada ao modelo com o relato do bug e a resposta gerada.
+
+**Exemplo simples:** imagens de produtos não aparecem no Safari.
+
+![Trace do exemplo simples](docs/trace_simples.png)
+
+**Exemplo médio:** pipeline de vendas calcula o valor total errado.
+
+![Trace do exemplo médio](docs/trace_medio.png)
+
+**Exemplo complexo:** sistema de relatórios gerenciais com vários problemas. Como a execução é longa, o print foi dividido em 4 partes.
+
+![Trace do exemplo complexo, parte 1](docs/trace_complex_parte1.png)
+
+![Trace do exemplo complexo, parte 2](docs/trace_complex_parte2.png)
+
+![Trace do exemplo complexo, parte 3](docs/trace_complex_parte3.png)
+
+![Trace do exemplo complexo, parte 4](docs/trace_complex_parte4.png)
 
 ### Comparação entre v1 e v2
 
@@ -416,6 +463,17 @@ A v1 não foi avaliada com as métricas, então a comparação abaixo é da estr
 - Python 3.10 ou superior
 - Conta no LangSmith, com API Key e handle público do Hub
 - API Key do Google Gemini ou da OpenAI
+
+### Dependências
+
+As versões exatas estão em `requirements.txt`, e a instalação abaixo cobre todas:
+
+- `langchain-core`: montagem dos prompts e das chains
+- `langsmith`: Prompt Hub, tracing, datasets e avaliação
+- `langchain-google-genai` e `langchain-openai`: acesso aos modelos
+- `python-dotenv` e `pyyaml`: leitura do `.env` e dos prompts em YAML
+- `pydantic`: dependência de validação de dados
+- `pytest`: testes de validação
 
 ### Instalação
 
