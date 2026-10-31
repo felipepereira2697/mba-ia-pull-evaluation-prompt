@@ -11,35 +11,54 @@ sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
 from utils import validate_prompt_structure
 
+PROMPT_PATH = Path(__file__).parent.parent / "prompts" / "bug_to_user_story_v2.yml"
+
 def load_prompts(file_path: str):
     """Carrega prompts do arquivo YAML."""
     with open(file_path, 'r', encoding='utf-8') as f:
         return yaml.safe_load(f)
 
+@pytest.fixture
+def prompt():
+    """Dados do prompt otimizado."""
+    return load_prompts(PROMPT_PATH)["bug_to_user_story_v2"]
+
 class TestPrompts:
-    def test_prompt_has_system_prompt(self):
+    def test_prompt_has_system_prompt(self, prompt):
         """Verifica se o campo 'system_prompt' existe e não está vazio."""
-        pass
+        assert "system_prompt" in prompt
+        assert prompt["system_prompt"].strip()
 
-    def test_prompt_has_role_definition(self):
+    def test_prompt_has_role_definition(self, prompt):
         """Verifica se o prompt define uma persona (ex: "Você é um Product Manager")."""
-        pass
+        assert prompt["system_prompt"].strip().startswith("Você é um Product Manager")
 
-    def test_prompt_mentions_format(self):
+    def test_prompt_mentions_format(self, prompt):
         """Verifica se o prompt exige formato Markdown ou User Story padrão."""
-        pass
+        system_prompt = prompt["system_prompt"]
+        assert "Markdown" in system_prompt or "User Story" in system_prompt
+        assert "Como um [persona], eu quero [objetivo], para que [benefício]." in system_prompt
 
-    def test_prompt_has_few_shot_examples(self):
+    def test_prompt_has_few_shot_examples(self, prompt):
         """Verifica se o prompt contém exemplos de entrada/saída (técnica Few-shot)."""
-        pass
+        system_prompt = prompt["system_prompt"]
+        assert system_prompt.count("### Exemplo") >= 2
+        assert system_prompt.count("Relato:") >= 2
+        assert system_prompt.count("Resposta:") >= 2
 
-    def test_prompt_no_todos(self):
+    def test_prompt_no_todos(self, prompt):
         """Garante que você não esqueceu nenhum `[TODO]` no texto."""
-        pass
+        assert "[TODO]" not in prompt["system_prompt"]
+        assert "[TODO]" not in prompt["user_prompt"]
 
-    def test_minimum_techniques(self):
+    def test_minimum_techniques(self, prompt):
         """Verifica (através dos metadados do yaml) se pelo menos 2 técnicas foram listadas."""
-        pass
+        assert len(prompt.get("techniques_applied", [])) >= 2
+
+    def test_prompt_structure_is_valid(self, prompt):
+        """Verifica se o prompt passa na validação de estrutura de utils.py."""
+        is_valid, errors = validate_prompt_structure(prompt)
+        assert is_valid, errors
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "--tb=short"])

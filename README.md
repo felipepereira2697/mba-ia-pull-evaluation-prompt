@@ -352,3 +352,105 @@ Rode uma vez e guarde o endereço: ao compartilhar de novo, o link muda.
 - Não altere os datasets de avaliação - apenas os prompts em prompts/bug_to_user_story_v2.yml
 - Itere, itere, itere - é normal precisar de 3-5 iterações para atingir 0.8 em todas as métricas
 - Documente seu processo - a jornada de otimização é tão importante quanto o resultado final
+
+## Técnicas Aplicadas (Fase 2)
+
+O prompt otimizado está em `prompts/bug_to_user_story_v2.yml` e usa três técnicas.
+
+### Few-shot Learning
+
+- **Por que:** é obrigatória no desafio e mostra ao modelo o nível de detalhe esperado, o que seria difícil de descrever só com regras.
+- **Como:** o `system_prompt` traz três pares de relato e resposta, um para cada nível de complexidade (simples, médio e complexo).
+
+Esses três exemplos foram copiados do dataset de avaliação (linhas 2, 7 e 13 de `datasets/bug_to_user_story.jsonl`). Por isso, as notas desses exemplos tendem a ficar infladas, já que o modelo vê as respostas esperadas. Os outros 12 exemplos medem melhor a capacidade real do prompt.
+
+### Role Prompting
+
+- **Por que:** a v1 usava um "assistente" genérico. Uma persona de produto orienta a resposta para a visão do usuário afetado, e não para a correção técnica.
+- **Como:** o prompt começa com "Você é um Product Manager sênior, especialista em transformar relatos de bugs em User Stories".
+
+### Skeleton of Thought
+
+- **Por que:** as respostas de referência têm estrutura previsível, que cresce com a complexidade do bug. Um esqueleto fixo reproduz essa estrutura sem imprimir o raciocínio na resposta, o que poderia reduzir as notas de Clarity e Precision.
+- **Como:** o prompt define etapas internas de construção e as seções exigidas para cada nível de complexidade.
+
+## Resultados Finais
+
+O prompt `bebopdev/bug_to_user_story_v2` foi aprovado na primeira avaliação completa, com todas as métricas acima de 0.8 e média geral de 0.91. A avaliação usou o modelo `gemini-3.1-flash-lite` para gerar as respostas e para dar as notas (experimento `bebopdev-bug_to_user_story_v2-951806f4`).
+
+| Métrica | Todos os 15 exemplos | 12 exemplos fora do Few-shot |
+|---|---|---|
+| Helpfulness | 0.92 | 0.89 |
+| Correctness | 0.90 | 0.88 |
+| F1-Score | 0.91 | 0.89 |
+| Clarity | 0.93 | 0.91 |
+| Precision | 0.90 | 0.88 |
+
+Os 3 exemplos copiados para o Few-shot tiraram 1.00 em todas as métricas, o que eleva a média geral. Por isso, a segunda coluna mostra o resultado sem eles.
+
+Alguns exemplos ficaram abaixo de 0.8 em uma métrica, sem reprovar o prompt, porque o critério usa a média de cada métrica. Nos casos de Precision (0.66 e 0.73), o avaliador afirma que uma User Story não foi solicitada, já que ele não vê as instruções do prompt. Nos casos de F1 (0.75 e 0.79), ele cobra detalhes que estão na referência, mas não no relato do bug. O prompt não foi ajustado para esses casos, porque isso exigiria inventar requisitos.
+
+### Evidências no LangSmith
+
+- Link público do dataset de avaliação: pendente
+- Screenshots das avaliações: pendente
+- Tracing detalhado de 3 exemplos: pendente
+
+### Comparação entre v1 e v2
+
+A v1 não foi avaliada com as métricas, então a comparação abaixo é da estrutura dos prompts.
+
+| Aspecto | v1 | v2 | Por que mudou |
+|---|---|---|---|
+| Persona | "Assistente" genérico | Product Manager sênior | Orienta a resposta para a visão do usuário afetado |
+| Instruções | "Crie uma user story" | Etapas internas e regras explícitas | Reduz a ambiguidade e a invenção de dados |
+| Formato | Não definido | User Story e critérios Dado/Quando/Então, com seções por complexidade | Acompanha o nível de detalhe esperado pelas referências |
+| Exemplos | Nenhum | 3 exemplos, um por nível | Mostra o resultado esperado |
+| Edge cases | Nenhum | Relato vago, vários problemas, código no relato, outro idioma e texto que não é bug | Define o comportamento fora do caso comum |
+| System e user | `{bug_report}` nos dois | Regras no system e relato só no user | Remove a duplicação e separa instruções de dados |
+
+## Como Executar
+
+### Pré-requisitos
+
+- Python 3.10 ou superior
+- Conta no LangSmith, com API Key e handle público do Hub
+- API Key do Google Gemini ou da OpenAI
+
+### Instalação
+
+```
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+cp .env.example .env
+```
+
+Preencha o `.env`. Para reproduzir o resultado acima, use `LLM_PROVIDER=google` e:
+
+```
+LLM_MODEL=gemini-3.1-flash-lite
+EVAL_MODEL=gemini-3.1-flash-lite
+```
+
+Cada avaliação faz cerca de 60 chamadas ao modelo. Em planos gratuitos, confira se a cota do modelo escolhido é suficiente, porque alguns modelos do Gemini têm limite diário menor que isso.
+
+### Comandos de cada fase
+
+Execute a partir da raiz do repositório.
+
+```
+# 1. Baixa o prompt inicial para prompts/bug_to_user_story_v1.yml
+python src/pull_prompts.py
+
+# 2. Valida a estrutura do prompt otimizado
+pytest tests/test_prompts.py
+
+# 3. Publica prompts/bug_to_user_story_v2.yml no LangSmith Hub
+python src/push_prompts.py
+
+# 4. Avalia o prompt publicado e imprime o link do experimento
+python src/evaluate.py
+```
+
+Depois de editar o YAML, repita o push antes de avaliar, porque a avaliação usa a versão publicada no Hub.
